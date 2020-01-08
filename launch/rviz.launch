@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+
+<launch>
+    <!-- Rviz node -->
+    <param name="use_gui" value="True"/>
+    <node name="rviz" pkg="rviz" type="rviz"  args="-d $(find ecn_ros2019)/launch/config.rviz" />
+    
+    <!-- Simulator for BBx-->
+    <node name="simulator" pkg="ecn_ros2019" type="sim" output="screen"/>
+    
+    <include file="$(find ecn_ros2019)/launch/spawn.launch">
+    <arg name="robot" value="bb"/>
+    <arg name="name" value="bb8"/>
+    </include>
+    
+    <include file="$(find ecn_ros2019)/launch/spawn.launch">
+    <arg name="robot" value="bb"/>
+    <arg name="name" value="bb9"/>
+    </include>
+    
+    <include file="$(find ecn_ros2019)/launch/spawn.launch">
+    <arg name="robot" value="d"/>
+    <arg name="name" value="d0"/>
+    </include>
+    
+    <include file="$(find ecn_ros2019)/launch/spawn.launch">
+    <arg name="robot" value="d"/>
+    <arg name="name" value="d9"/>
+    </include>
+</launch>

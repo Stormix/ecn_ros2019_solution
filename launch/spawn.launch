@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+
+<launch>
+  <arg name="robot" default="bb"/>
+  <arg name="name" default="bb8"/>
+  
+  <group ns="$(arg name)">
+    <param name="robot_description" command="$(find xacro)/xacro $(find ecn_ros2019)/urdf/$(arg robot).xacro name:=$(arg name)"/>
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
+  </group>
+</launch>

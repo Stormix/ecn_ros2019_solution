@@ -1,0 +1,128 @@
+#!/usr/bin/env python
+
+# modules
+import rospy
+from geometry_msgs.msg import Twist, Pose2D
+from sensor_msgs.msg import JointState
+import tf
+import numpy as np
+
+dt = 0.05
+
+rospy.init_node('sim')   
+br = tf.TransformBroadcaster()
+
+def sat(v, m = 1):
+    return min(m, max(v, -m))
+
+class Robot:
+    def __init__(self, name, x, y, theta):
+        self.name = name
+        self.x = x
+        self.y = y
+        self.theta = theta
+        
+        self.joint_pub = rospy.Publisher(name + '/joint_states', JointState, queue_size=10)
+        self.joints = JointState()
+        self.joints.name = ['wheel','torso','neck']
+        self.joints.position = [0,0,0]
+        if 'd' in name:
+            self.joints.velocity = [3,1,4]
+        
+        # auto move
+        self.v = 0
+        self.w = 0
+        self.last_cmd = 0
+        self.last_joints = 0
+        
+        if 'd' in name:            
+            self.cmd_sub = rospy.Subscriber(name + '/cmd_vel', Twist, self.cmd_callback)
+            self.joint_sub = rospy.Subscriber(name + '/joint_states', JointState, self.joint_callback)
+            
+    def cmd_callback(self, msg):
+        self.v = msg.linear.x
+        self.w = msg.angular.z
+        self.last_cmd = rospy.Time.now().to_sec()
+        
+    def joint_callback(self, msg):
+        if len(msg.velocity) == 0:
+            print('Received real control joints')
+            self.last_joints = rospy.Time.now().to_sec()
+            
+    def move(self):
+        t = rospy.Time.now().to_sec()
+        print('t-last = {}'.format(t - self.last_cmd))
+        if t - self.last_cmd > 1:
+            self.v = 0
+            self.w = 0            
+        self.moveVW(self.v, self.w)
+        
+        if t - self.last_joints > 1:
+            self.joints.header.stamp = rospy.Time.now()
+            self.joints.position = [0,0,0]
+            self.joint_pub.publish(self.joints)
+    
+    def moveVW(self, v, w):
+        
+        self.x += v*np.cos(self.theta)*dt
+        self.y += v*np.sin(self.theta)*dt
+        self.theta = (self.theta + w*dt) % (2*np.pi)
+                
+        if 'bb' in self.name:
+            # update joints accordingly
+            self.joints.header.stamp = rospy.Time.now()
+            self.joints.position[0] += 3.7*v*dt
+            self.joints.position[1] = sat(v/4.) * np.pi/4
+            self.joints.position[2] = sat(w/2.) * np.pi/6
+            self.joint_pub.publish(self.joints)
+        
+        # publish position
+        br.sendTransform((self.x, self.y, 0),
+            tf.transformations.quaternion_from_euler(0, 0, self.theta),
+            rospy.Time.now(),
+            self.name, 'world')
+
+    def moveXY(self, vx, vy):
+        theta = np.arctan2(vy, vx)
+        if abs(np.cos(theta)) > abs(np.sin(theta)):
+            v = vx/np.cos(theta)
+        else:
+            v = vy/np.sin(theta)
+        w = min((theta-self.theta, theta+2*np.pi-self.theta, theta-2*np.pi-self.theta), key=lambda x: abs(x))/dt
+        self.moveVW(v, w)
+  
+    
+if __name__ == "__main__":
+    rospy.init_node('sim')   
+    br = tf.TransformBroadcaster()
+    
+    # open loop params
+    a = .7
+    b = 1.5
+    
+    bb8 = Robot('bb8', a+b, 0, np.pi/2)
+    bb9 = Robot('bb9', a+b+0.7, 0, np.pi/2)
+
+    d0 = Robot('d0', 0, 1, 0)
+    d9 = Robot('d9', 0, -1, 0)
+    
+    rate = rospy.Rate(1/dt)
+
+    t = 0
+    while not rospy.is_shutdown():
+
+        # bb8 = open loop
+        c,s = np.cos(.4*t),np.sin(.4*t)
+        bb8.moveXY(-a*s-2*b*c*s, a*c+b-2*b*s*s)
+        
+        # bb9 = open loop
+        c,s = np.cos(.4*t),np.sin(.4*t)
+        bb9.moveXY((-a*s-2*b*c*s), -(a*c+b-2*b*s*s))
+        
+        # do and d9 - 0 or received cmd_vel
+        d0.move()
+        d9.move()
+        
+        rate.sleep()
+        t += dt
+    

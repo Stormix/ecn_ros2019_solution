@@ -1,0 +1,131 @@
+\documentclass{ecnreport}
+
+\stud{OD Robotique 2019-2020}
+\topic{Examen de Middleware/ROS}
+
+\begin{document}
+
+\inserttitle{Examen de Middleware/ROS\newline }
+
+\insertsubtitle{2h, documents autorisés}
+
+
+
+\section{Téléchargement du package}
+
+L'examen est téléchargeable sous forme de package ROS avec la commande suivante : 
+\begin{center}\defaultstyle
+\begin{lstlisting}
+cd ~/ros/src
+git clone https://github.com/oKermorgant/ecn_ros2019.git
+catkin build ecn_ros2019
+gen_qtcreator_config    # sur les PCs de la salle P-robotique
+\end{lstlisting}
+\end{center}
+
+\section{Description du package}
+
+\subsection{Le simulateur}
+
+Lancez \texttt{rviz.launch}:
+\begin{center}\defaultstyle
+\begin{lstlisting}
+roslaunch ecn_ros2019 rviz.launch
+\end{lstlisting}
+\end{center}
+
+\def\w{\omega}
+
+RViz est lancé avec quatre robots mobiles:
+\begin{itemize}
+ \item Deux robots BB-8 et BB-9 qui suivent une trajectoire prédéfinie
+ \item Deux robot D-0 et D-9 qui attendent vos instructions
+\end{itemize}Ces robots évoluent en $(x,y,\theta)$ et sont commandés avec une vitesse linéaire $v$ et angulaire $\w$.
+
+\subsection{Nodes et topics}
+
+Le node \texttt{/simulator} rend compte du déplacement des robots. Celui de BB-8 et BB-9 sont imposés, les autres dépendent d'une consigne de vitesse.\\
+Les poses de chaque robot sont disponibles via le topic \texttt{/tf}.\\
+
+Pour plus d'information, les nodes et topics sont visualisables avec \texttt{rqt\_graph} et accessibles via les commandes \texttt{rosnode} et \texttt{rostopic}.
+
+Le simulateur ne prend en compte que les champs \texttt{linear.x} (vitesse linéaire dans le repère du robot) et \texttt{angular.z} (vitesse angulaire).
+
+\section{Objectifs}
+
+Les robots de type D aiment la compagnie et cherchent à suivre le robot allié (BB-8 pour D-0, BB-9 pour D-9). Inversement, ils sont également craintifs et essaient d'éviter le robot ennemi.
+
+Le travail demandé est d'écrire :
+\begin{itemize}
+ \item Un node pour réaliser le mouvement d'un robot de type D
+ \item Un launchfile pour exécuter deux fois le node ci-dessus
+\end{itemize}
+
+\subsection{Écriture du node}
+
+Le node principal est à écrire en C++, en modifiant le fichier \texttt{main.cpp}. Ce node doit :
+\begin{itemize}
+ \item Prendre trois paramètres privés:
+ \begin{enumerate}
+  \item \texttt{robot} : le nom du robot contrôlé (\texttt{d0} ou \texttt{d9})
+  \item \texttt{friend}\footnote{Attention en C++, \texttt{friend} est un mot-clé} : le nom du robot ami (\texttt{bb8} ou \texttt{bb9})
+  \item \texttt{foe} : le nom du robot ennemi (\texttt{bb9} ou \texttt{bb8})
+ \end{enumerate}
+ \item Obtenir, via un TF Listener, la position relative des robots ami et ennemi
+ \item Publier sur un topic de commande en vitesse (type \texttt{geometry\_msgs/Twist}), nommé \texttt{cmd\_vel}. Seuls les champs \texttt{linear.x} et \texttt{angular.z} sont considérés.
+ \item Publier sur un topic de position articulaire (type \texttt{sensor\_msgs/JointState}), nommé \texttt{jointe\_states}.
+\end{itemize}
+On pourra commencer par écrire le node pour piloter uniquement un des robots D, avant de rendre le node générique.
+
+\subsection{Loi de commande}
+
+Via un TF Listener il est possible d'obtenir les positions relatives des robots ami (repère du nom du paramètre \texttt{friend}), ennemi (paramètre \texttt{foe}) par rapport au repère du robot piloté (paramètre \texttt{robot}).\\
+
+On note $(x_1, y_1)$ la position du robot ami dans le repère du robot piloté, et $(x_2,y_2)$ la position du robot ennemi. 
+La loi de commande est définie par une série d'instructions implémentées dans le fichier \texttt{control.h} sous la forme d'une fonction:
+ \begin{center}\cppstyle
+\begin{lstlisting}
+struct Cmd {double v, w;};
+Cmd command(double x1, double y1,double x2, double y2);
+\end{lstlisting}
+\end{center}
+Cette fonction est à utiliser pour transformer les positions $(x_1,y_1,x_2,y_2)$ en une consigne sous la forme d'un message de type \texttt{geometry\_msgs/Twist}, à publier sur \texttt{cmd\_vel}.
+
+\subsection{Positions articulaires}
+
+Les robots de type D ont trois articulations: la roue, le torse et le cou. Ces articulations dépendent de la vitesse du robot et leurs positions sont définies comme suit :
+\begin{center}
+ \begin{tabular}{|c|c|c|}\hline
+  Articulation & Nom & Position \\\hline
+  Roue & \texttt{wheel} & $+3.7.v.dt$ (incrémental) \\\hline
+  Torse & \texttt{torso} & $v.\pi/12$\\\hline
+  Cou & \texttt{neck} & $\w.\pi/12$\\\hline
+ \end{tabular}
+\end{center}
+La position de la roue est définie de façon incrémentale, par rapport à la position à l'itération précédente. Les autres positions sont définies de façon absolue.
+
+Les noms et positions des articulations doivent être écrits dans un message de type\\ \texttt{sensor\_msgs/JointState}, à publisher sur \texttt{joint\_states}. Pour que le message soit pris en compte par la simulation, on doit préciser le time stamp avant de le publier:
+ \begin{center}\cppstyle
+\begin{lstlisting}
+msg.header.stamp = ros::Time::now();
+\end{lstlisting}
+\end{center}
+
+ 
+\subsection{Écriture du launchfile}
+
+Le node ci-dessus utilise des topics génériques, il convient donc de le lancer via un launchfile pour l'application qui nous intéresse.\\
+
+Écrire un launchfile permettant à D-0 et D-9 de se déplacer. On utilisera des paramètres privés ainsi que la notion de namespace, permettant d'utiliser des noms de topics relatifs dans le code C++.\\
+
+Pour simplifier le développement du node on pourra dans un premier temps écrire en dur les paramètres permettant à D-0 de suivre BB-8 en évitant BB-9.
+
+\section{Soumission du travail}
+
+Le package final est à zipper et à soumettre via {\link{https://script.google.com/macros/s/AKfycbxKq50aC9v_81mIxFyt5bX8moz7G7X3KBBG1ATGOepkq3Rpmh4c/exec}{ce formulaire en ligne}.
+
+
+
+
+
+\end{document}

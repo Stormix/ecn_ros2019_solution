@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>ecn_ros2019</name>
+  <version>0.0.0</version>
+  <description>The ecn_ros2019 package</description>
+
+  <maintainer email="olivier@todo.todo">olivier</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>geometry_msgs</depend>
+  <depend>roscpp</depend>
+  <depend>tf2_ros</depend>
+
+
+</package>
