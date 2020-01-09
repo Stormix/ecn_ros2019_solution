@@ -46,12 +46,10 @@ class Robot:
         
     def joint_callback(self, msg):
         if len(msg.velocity) == 0:
-            print('Received real control joints')
             self.last_joints = rospy.Time.now().to_sec()
             
     def move(self):
         t = rospy.Time.now().to_sec()
-        print('t-last = {}'.format(t - self.last_cmd))
         if t - self.last_cmd > 1:
             self.v = 0
             self.w = 0            
