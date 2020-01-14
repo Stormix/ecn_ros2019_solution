@@ -1,0 +1,13 @@
+<?xml version="1.0" ?>
+<launch>
+    <node pkg="ecn_ros2019" type="control" name="control" ns="d0">
+        <param name="robot" value="d0" />
+        <param name="friend" value="bb8" />
+        <param name="foe" value="bb9" />
+    </node>
+    <node pkg="ecn_ros2019" type="control" name="control" ns="d9">
+        <param name="robot" value="d9" />
+        <param name="friend" value="bb9" />
+        <param name="foe" value="bb8" />
+    </node>
+</launch>
